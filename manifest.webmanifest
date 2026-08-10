@@ -1,0 +1,10 @@
+{
+  "name": "Eleva",
+  "short_name": "Eleva",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0d0c1d",
+  "theme_color": "#17153a",
+  "description": "Afirmações, foco e pequenas ações para fortalecer sua rotina.",
+  "icons": []
+}
