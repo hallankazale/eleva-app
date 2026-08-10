@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'eleva-state-v1';
+const STORAGE_KEY = 'eleva-state-v2';
 
 const defaultState = {
   onboarded: false,
@@ -6,44 +6,13 @@ const defaultState = {
   goals: ['prosperidade'],
   morning: '07:00',
   night: '21:30',
-  favorite: false,
-  actionDone: false,
+  favorites: [],
+  actionDoneBySlot: {},
   streak: 1,
   completedDays: 1,
   activeTab: 'home',
-};
-
-const affirmations = {
-  prosperidade: {
-    label: 'Prosperidade',
-    text: 'Eu desenvolvo sabedoria para reconhecer oportunidades e transformar boas ideias em ações consistentes.',
-    action: 'Revise hoje uma pequena despesa e escolha uma melhoria financeira possível para esta semana.'
-  },
-  saude: {
-    label: 'Saúde e bem-estar',
-    text: 'Eu escolho cuidar do meu corpo com respeito, equilíbrio e constância, um passo de cada vez.',
-    action: 'Faça hoje uma escolha simples a favor do seu bem-estar: água, movimento, descanso ou alimentação equilibrada.'
-  },
-  confianca: {
-    label: 'Autoconfiança',
-    text: 'Eu posso aprender, ajustar o caminho e continuar avançando mesmo quando algo não sai perfeito.',
-    action: 'Anote uma decisão que você vem adiando e dê o menor primeiro passo possível hoje.'
-  },
-  motivacao: {
-    label: 'Motivação',
-    text: 'Eu não preciso esperar o momento perfeito para começar; progresso nasce de ações pequenas e repetidas.',
-    action: 'Escolha uma tarefa de até 10 minutos e conclua antes de começar outra.'
-  },
-  gratidao: {
-    label: 'Gratidão',
-    text: 'Eu reconheço o que já existe de bom sem deixar de construir o que ainda quero viver.',
-    action: 'Registre três coisas simples que foram boas hoje.'
-  },
-  fe: {
-    label: 'Fé',
-    text: 'Eu entrego minhas preocupações a Deus e sigo com fé, sabedoria e coragem para fazer minha parte.',
-    action: 'Separe alguns minutos para oração, silêncio e uma decisão prática coerente com aquilo que você acredita.'
-  },
+  slotAssignments: {},
+  usedAffirmationIds: [],
 };
 
 const goalOptions = [
@@ -55,321 +24,84 @@ const goalOptions = [
   ['fe', '🙏', 'Fé', 'Reflexões espirituais com linguagem cristã'],
 ];
 
-function loadState() {
-  try {
-    return { ...defaultState, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') };
-  } catch {
-    return { ...defaultState };
+const phraseParts = {
+  prosperidade: {
+    label: 'Prosperidade',
+    starts: ['Hoje eu direciono minha energia para escolhas conscientes','Eu reconheço que prosperidade também nasce de disciplina','Minha relação com o dinheiro pode se tornar mais madura','Eu desenvolvo visão para perceber oportunidades reais','Eu construo segurança financeira com decisões consistentes','Eu respeito cada recurso que chega às minhas mãos','Eu posso aprender novas formas de gerar valor','Eu avanço financeiramente quando ajo com clareza','Eu transformo intenção em planejamento','Eu escolho pensar no longo prazo sem ignorar o presente','Eu fortaleço hábitos que sustentam crescimento','Eu me permito buscar oportunidades com responsabilidade'],
+    middles: ['e faço uma ação prática que aproxima meus objetivos','sem confundir esperança com resultado garantido','e observo meus gastos antes de decidir','criando espaço para aprender, ajustar e melhorar','priorizando valor, utilidade e equilíbrio','e trato cada oportunidade com análise e coragem','mantendo foco no que realmente posso controlar','e procuro aumentar minha capacidade de resolver problemas','sem depender de impulsos ou promessas fáceis','e faço escolhas alinhadas às minhas prioridades','transformando pequenos avanços em constância','e valorizo progresso real acima de aparência'],
+    ends: ['um passo de cada vez.','com serenidade e responsabilidade.','com foco no que posso construir hoje.','sem pressa, mas sem parar.','com disciplina, aprendizado e ação.','com inteligência e constância.','respeitando meu momento atual.','fazendo minha parte com excelência.','sem comparar meu caminho com o de outras pessoas.','criando bases mais fortes para o futuro.','com coragem para revisar o que não funciona.','celebrando cada avanço verdadeiro.'],
+    actions: ['Anote uma despesa que pode ser reduzida sem prejudicar sua rotina.','Separe 10 minutos para revisar seus gastos recentes.','Escreva uma forma realista de aumentar sua renda ou habilidade profissional.','Escolha uma compra que pode esperar 24 horas antes de decidir.','Defina uma pequena meta financeira para os próximos 7 dias.','Organize uma conta ou compromisso financeiro que está pendente.','Liste uma habilidade que pode aumentar seu valor profissional.','Revise uma assinatura ou gasto recorrente hoje.','Guarde um pequeno valor, mesmo que simbólico, para reforçar o hábito.','Pesquise uma oportunidade concreta antes de tomar qualquer decisão.','Escolha uma prioridade financeira para esta semana.','Anote o que entrou e saiu hoje para aumentar sua consciência financeira.']
+  },
+  saude: {
+    label: 'Saúde e bem-estar',
+    starts: ['Hoje eu trato meu corpo com respeito','Eu escolho ouvir os sinais do meu corpo','Meu bem-estar merece atenção constante','Eu posso cuidar de mim sem buscar perfeição','Eu valorizo descanso, movimento e alimentação equilibrada','Eu construo saúde por meio de hábitos possíveis','Eu reconheço que autocuidado também é responsabilidade','Eu escolho reduzir excessos e aumentar equilíbrio','Meu corpo merece gentileza e cuidado','Eu priorizo escolhas que favorecem meu bem-estar','Eu posso recomeçar um hábito saudável hoje','Eu cuido da minha saúde com consciência e constância'],
+    middles: ['e faço escolhas simples que apoiam meu bem-estar','sem substituir orientação médica quando ela é necessária','respeitando meus limites e necessidades reais','com atenção ao sono, hidratação e movimento','sem transformar autocuidado em cobrança','e observo o que me faz bem de verdade','fazendo pequenas melhorias sustentáveis','e busco ajuda profissional quando preciso','sem acreditar em soluções milagrosas','mantendo constância no que é seguro e saudável','com paciência para perceber meu progresso','e reconheço que descanso também faz parte do cuidado'],
+    ends: ['um passo de cada vez.','com equilíbrio e respeito.','de forma possível para hoje.','sem culpa e sem exageros.','com atenção e responsabilidade.','valorizando pequenas melhorias.','respeitando meu ritmo.','com gentileza comigo mesmo.','sem ignorar sinais importantes.','criando uma rotina mais saudável.','com constância em vez de pressa.','fazendo escolhas que posso sustentar.'],
+    actions: ['Beba um copo de água e observe como está sua hidratação hoje.','Faça alguns minutos de movimento adequado ao seu condicionamento.','Planeje um horário de descanso mais consistente para hoje.','Inclua uma escolha equilibrada em uma das refeições do dia.','Afaste-se da tela por alguns minutos e descanse os olhos.','Faça uma pausa curta para respirar lentamente e relaxar os ombros.','Observe se existe algum sintoma que merece avaliação profissional.','Organize uma pequena parte da rotina para reduzir estresse desnecessário.','Escolha uma atitude de autocuidado que seja segura e possível hoje.','Faça uma caminhada leve se isso for adequado para você.','Evite um excesso que costuma prejudicar seu bem-estar.','Prepare seu ambiente para favorecer uma noite de sono melhor.']
+  },
+  confianca: {
+    label: 'Autoconfiança',
+    starts: ['Eu posso confiar mais na minha capacidade de aprender','Eu não preciso saber tudo para começar','Minha voz merece espaço','Eu reconheço o que já superei','Eu posso agir mesmo sentindo insegurança','Eu desenvolvo confiança por meio de prática','Eu me permito errar, corrigir e continuar','Eu não preciso da aprovação de todos para avançar','Eu posso me posicionar com respeito e firmeza','Eu reconheço minhas habilidades sem diminuir meu valor','Eu escolho falar comigo com mais respeito','Eu me torno mais seguro quando cumpro pequenos compromissos comigo'],
+    middles: ['e transformo dúvida em preparação','sem exigir perfeição antes de agir','valorizando experiência e aprendizado','e aceito que crescimento inclui desconforto','sem me comparar o tempo todo','construindo evidências através das minhas ações','e uso erros como informação','mantendo limites claros e saudáveis','com coragem para dizer o que penso','e reconheço progresso que antes eu ignorava','substituindo autocrítica exagerada por responsabilidade','fazendo o que está ao meu alcance hoje'],
+    ends: ['com coragem e equilíbrio.','um passo de cada vez.','sem precisar provar nada a ninguém.','com respeito por quem eu sou.','de forma cada vez mais natural.','com firmeza e serenidade.','sem abandonar quem eu sou para agradar.','com espaço para aprender.','seguindo mesmo quando existe medo.','com responsabilidade e confiança.','reconhecendo meu próprio valor.','construindo confiança pela prática.'],
+    actions: ['Faça hoje uma pequena tarefa que você vem adiando por insegurança.','Anote três coisas que você já aprendeu a fazer bem.','Diga “não” a algo que ultrapassa um limite importante para você.','Prepare-se por 10 minutos para uma conversa ou tarefa importante.','Faça uma pergunta que você normalmente evitaria por vergonha.','Registre uma pequena vitória do seu dia.','Escolha uma decisão simples e assuma responsabilidade por ela.','Troque uma frase de autocrítica por uma avaliação mais justa.','Conclua um compromisso pequeno que você fez consigo mesmo.','Pratique explicar uma ideia em voz alta com clareza.','Identifique uma habilidade que você quer fortalecer esta semana.','Faça algo útil mesmo sem esperar sentir confiança total primeiro.']
+  },
+  motivacao: {
+    label: 'Motivação',
+    starts: ['Eu começo antes de sentir vontade perfeita','Pequenas ações podem mudar a direção do meu dia','Eu escolho progresso em vez de espera','Eu posso avançar mesmo em ritmo lento','Meu foco melhora quando reduzo distrações','Eu transformo intenção em um próximo passo claro','Eu não preciso resolver tudo de uma vez','Eu escolho terminar uma coisa antes de começar várias','Minha constância vale mais do que um impulso passageiro','Eu posso recomeçar agora sem esperar amanhã','Eu construo resultados quando repito boas ações','Eu direciono minha atenção para o que realmente importa'],
+    middles: ['e faço o que cabe nos próximos minutos','sem depender de motivação constante','priorizando uma tarefa de cada vez','e reduzo a distância entre pensar e agir','criando um ambiente que favoreça meu foco','com metas pequenas e observáveis','sem transformar atraso em desistência','e protejo meu tempo das distrações mais óbvias','mantendo compromisso mesmo em dias comuns','e aceito recomeçar quantas vezes for necessário','valorizando repetição e consistência','e escolho uma prioridade real para este momento'],
+    ends: ['agora.','com simplicidade.','sem complicar o próximo passo.','com foco e presença.','um bloco de tempo por vez.','sem esperar perfeição.','com constância possível.','fazendo menos, mas fazendo melhor.','com energia direcionada.','recomeçando sem culpa.','até transformar esforço em hábito.','com clareza sobre minha prioridade.'],
+    actions: ['Escolha uma tarefa de até 10 minutos e conclua agora.','Coloque o celular longe por 15 minutos e faça uma prioridade.','Escreva as três tarefas mais importantes do dia e comece pela primeira.','Divida uma tarefa grande em um passo que possa ser feito hoje.','Finalize algo pequeno que está quase pronto.','Defina um cronômetro de 15 minutos e trabalhe sem alternar de tarefa.','Remova uma distração visível do seu ambiente.','Escolha uma coisa para não fazer hoje e proteja sua prioridade.','Comece por dois minutos; depois decida se continua.','Anote o próximo passo específico de um projeto importante.','Faça primeiro a tarefa que evita um problema futuro.','Encerre uma pendência simples antes de abrir uma nova atividade.']
+  },
+  gratidao: {
+    label: 'Gratidão',
+    starts: ['Eu reconheço o que já existe de bom na minha vida','Eu escolho perceber pequenos momentos que normalmente passam despercebidos','Minha gratidão não apaga dificuldades, mas amplia minha perspectiva','Eu valorizo pessoas e experiências que me sustentam','Eu posso desejar mudanças e ainda agradecer pelo presente','Eu observo com mais atenção o que funcionou hoje','Eu reconheço recursos que antes pareciam comuns','Eu escolho lembrar do que recebi e também do que construí','Eu valorizo pequenas conquistas','Eu posso encontrar significado em coisas simples','Eu direciono minha atenção para aquilo que merece ser reconhecido','Eu cultivo gratidão sem negar a realidade'],
+    middles: ['e deixo espaço para apreciar isso de verdade','sem transformar gratidão em obrigação','mantendo os pés na realidade','e expresso reconhecimento quando posso','sem abandonar meus objetivos','e registro detalhes positivos do meu dia','percebendo o valor do que costuma parecer automático','e reconheço também meu próprio esforço','sem diminuir a importância delas','e permito que isso traga mais presença','equilibrando desafios e recursos','com sinceridade e consciência'],
+    ends: ['hoje.','com presença.','sem exagero, apenas com verdade.','e demonstro isso quando possível.','enquanto continuo avançando.','para não deixar o bom passar despercebido.','com atenção aos detalhes.','sem esquecer de agradecer a mim pelo esforço.','como parte real da minha história.','e aproveito melhor o momento.','com uma visão mais completa do dia.','sem esconder aquilo que ainda precisa mudar.'],
+    actions: ['Anote três coisas específicas pelas quais você é grato hoje.','Envie uma mensagem curta agradecendo alguém por algo concreto.','Registre uma pequena coisa que deu certo nas últimas 24 horas.','Observe por um minuto algo simples que normalmente passa despercebido.','Agradeça mentalmente por uma habilidade ou recurso que você possui.','Escreva uma dificuldade que também trouxe algum aprendizado.','Reconheça uma pessoa que facilitou seu dia.','Anote uma conquista pequena que você normalmente ignoraria.','Tire alguns minutos para apreciar um momento sem usar o celular.','Liste duas coisas que hoje estão melhores do que há um ano.','Reconheça um esforço seu que merece crédito.','Escolha uma coisa boa do dia e conte a alguém por que ela foi importante.']
+  },
+  fe: {
+    label: 'Fé',
+    starts: ['Eu entrego minhas preocupações a Deus','Eu escolho caminhar com fé mesmo sem conhecer todos os detalhes','Minha confiança está em Deus, não no controle de todas as circunstâncias','Eu posso orar e também fazer minha parte com sabedoria','Eu descanso na presença de Deus sem abandonar minhas responsabilidades','Eu escolho alimentar minha mente com aquilo que fortalece minha fé','Eu reconheço que nem tudo está sob meu controle','Eu posso atravessar incertezas sem abandonar a esperança','Eu busco sabedoria antes de tomar decisões importantes','Eu lembro que fé e prudência podem caminhar juntas','Eu escolho confiar em Deus enquanto sigo em frente','Minha oração pode ser um lugar de entrega, clareza e coragem'],
+    middles: ['e sigo fazendo o que está ao meu alcance','sem transformar fé em garantia de resultado específico','e procuro responder às situações com sabedoria','unindo oração, responsabilidade e ação','e encontro espaço para respirar e discernir','meditando em verdades bíblicas e evitando medo desnecessário','e entrego a Deus aquilo que eu não consigo resolver','lembrando que esperança não depende de ter todas as respostas','e evito agir apenas por impulso','sem confundir confiança com imprudência','fazendo minha parte com honestidade','e levo minhas decisões diante de Deus'],
+    ends: ['com fé e responsabilidade.','confiando sem tentar controlar o futuro.','com serenidade e coragem.','um passo de cada vez.','com o coração mais tranquilo.','com discernimento.','sem carregar sozinho aquilo que posso entregar.','mantendo viva a esperança.','com paciência para decidir.','com equilíbrio.','sem abandonar a sabedoria.','buscando direção e paz.'],
+    actions: ['Separe alguns minutos para oração e depois anote uma ação prática para hoje.','Leia um pequeno trecho bíblico e registre o que ele lhe ensina.','Entregue em oração uma preocupação específica que está ocupando sua mente.','Antes de uma decisão, ore e liste fatos concretos que precisam ser considerados.','Envie uma palavra de encorajamento a alguém que esteja passando por dificuldade.','Separe cinco minutos de silêncio para oração e reflexão.','Anote uma situação em que você precisa de sabedoria, não apenas de rapidez.','Ore por algo que você não consegue controlar e cuide da parte que depende de você.','Leia um salmo e escolha uma ideia para levar consigo durante o dia.','Pratique gratidão em oração por três coisas específicas.','Reavalie uma preocupação perguntando: “o que depende de mim hoje?”','Faça uma ação de bondade coerente com aquilo que você crê.']
   }
-}
+};
 
-let state = loadState();
-const app = document.querySelector('#app');
+function loadState(){try{return{...defaultState,...JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}')}}catch{return{...defaultState}}}
+let state=loadState();
+const app=document.querySelector('#app');
+let activeUtterance=null;
+function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function setState(patch){state={...state,...patch};save();render()}
+function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]))}
+function dateLabel(){return new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'2-digit',month:'long'}).format(new Date())}
+function greeting(){const h=new Date().getHours();return h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'}
+function localDateKey(date=new Date()){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
+function minutesOf(time){const[h,m]=String(time||'00:00').split(':').map(Number);return h*60+m}
+function currentPeriod(){const n=new Date(),now=n.getHours()*60+n.getMinutes(),morning=minutesOf(state.morning),night=minutesOf(state.night),mid=morning<night?Math.round((morning+night)/2):900;return now<mid?'morning':'night'}
+function currentSlotKey(){return `${localDateKey()}|${currentPeriod()}`}
+function hashString(value){let hash=2166136261;for(let i=0;i<value.length;i++){hash^=value.charCodeAt(i);hash=Math.imul(hash,16777619)}return hash>>>0}
+function makeAffirmation(goal,a,b,c){const set=phraseParts[goal]||phraseParts.prosperidade;return{id:`${goal}-${a}-${b}-${c}`,goal,label:set.label,text:`${set.starts[a]} ${set.middles[b]} ${set.ends[c]}`,action:set.actions[(a*7+b*3+c)%set.actions.length]}}
+function generateCandidate(slotKey,attempt){const goals=state.goals.length?state.goals:['prosperidade'],seed=hashString(`${slotKey}|${attempt}|eleva-v2`),goal=goals[seed%goals.length],set=phraseParts[goal]||phraseParts.prosperidade,a=Math.floor(seed/3)%set.starts.length,b=Math.floor(seed/47)%set.middles.length,c=Math.floor(seed/997)%set.ends.length;return makeAffirmation(goal,a,b,c)}
+function affirmationForSlot(slotKey=currentSlotKey()){const existing=state.slotAssignments[slotKey];if(existing){const[goal,a,b,c]=existing.split('-');if(phraseParts[goal])return makeAffirmation(goal,Number(a),Number(b),Number(c))}const used=new Set(state.usedAffirmationIds||[]);let candidate;for(let attempt=0;attempt<25000;attempt++){candidate=generateCandidate(slotKey,attempt);if(!used.has(candidate.id))break}state.slotAssignments={...state.slotAssignments,[slotKey]:candidate.id};state.usedAffirmationIds=[...(state.usedAffirmationIds||[]),candidate.id];save();return candidate}
+function isFavorite(id){return(state.favorites||[]).includes(id)}
+function toggleFavorite(id){const f=new Set(state.favorites||[]);f.has(id)?f.delete(id):f.add(id);setState({favorites:[...f]})}
+function setAudioUi(on){const b=document.querySelector('#listen'),v=document.querySelector('#audioVisualizer');if(!b)return;b.classList.toggle('speaking',on);b.setAttribute('aria-pressed',String(on));const l=b.querySelector('.listen-label'),i=b.querySelector('.listen-icon');if(l)l.textContent=on?'Ouvindo…':'Ouvir';if(i)i.textContent=on?'■':'▶';if(v)v.classList.toggle('active',on)}
+function stopSpeaking(){if('speechSynthesis'in window)window.speechSynthesis.cancel();activeUtterance=null;setAudioUi(false)}
+function speak(text){if(!('speechSynthesis'in window)){alert('A leitura em voz alta não está disponível neste navegador.');return}if(speechSynthesis.speaking){stopSpeaking();return}const u=new SpeechSynthesisUtterance(text);activeUtterance=u;u.lang='pt-BR';u.rate=.9;u.pitch=1;u.onstart=()=>setAudioUi(true);u.onend=()=>{activeUtterance=null;setAudioUi(false)};u.onerror=()=>{activeUtterance=null;setAudioUi(false)};const voices=speechSynthesis.getVoices(),pt=voices.find(v=>v.lang?.toLowerCase().startsWith('pt-br'))||voices.find(v=>v.lang?.toLowerCase().startsWith('pt'));if(pt)u.voice=pt;speechSynthesis.cancel();speechSynthesis.speak(u)}
 
-function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
-function setState(patch) {
-  state = { ...state, ...patch };
-  save();
-  render();
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, (char) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;'
-  }[char]));
-}
-
-function dateLabel() {
-  return new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long', day: '2-digit', month: 'long'
-  }).format(new Date());
-}
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Bom dia';
-  if (hour < 18) return 'Boa tarde';
-  return 'Boa noite';
-}
-
-function speak(text) {
-  if (!('speechSynthesis' in window)) {
-    alert('A leitura em voz alta não está disponível neste navegador.');
-    return;
-  }
-  speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'pt-BR';
-  utterance.rate = 0.92;
-  utterance.pitch = 1;
-  speechSynthesis.speak(utterance);
-}
-
-function splash() {
-  app.innerHTML = `
-    <main class="screen splash fade-in">
-      <div class="splash-inner">
-        <div class="logo-mark">✦</div>
-        <h1 class="brand">Eleva</h1>
-        <p class="tagline">Fortaleça sua mente.<br>Transforme seu dia.</p>
-        <div class="loading-dots" aria-label="Carregando"><span></span><span></span><span></span></div>
-      </div>
-    </main>`;
-
-  setTimeout(() => {
-    if (state.onboarded) {
-      render();
-    } else {
-      state.onboardingStep = 0;
-      renderOnboarding();
-    }
-  }, 1900);
-}
-
-const onboarding = [
-  { icon: '✨', eyebrow: 'Bem-vindo', title: 'Comece por dentro.', text: 'Pensamentos mais conscientes podem apoiar hábitos, escolhas e decisões melhores no dia a dia.' },
-  { icon: '🎧', eyebrow: 'Ouça e respire', title: 'Um momento só seu.', text: 'Escute afirmações narradas pela manhã e à noite, com uma experiência simples e tranquila.' },
-  { icon: '✓', eyebrow: 'Palavra + ação', title: 'Não fique apenas na frase.', text: 'Cada momento pode trazer uma pequena ação prática para transformar intenção em comportamento.' },
-];
-
-function renderOnboarding() {
-  const step = onboarding[state.onboardingStep] || onboarding[0];
-  app.innerHTML = `
-    <main class="screen fade-in">
-      <div class="top-actions">
-        <span class="eyebrow">Eleva</span>
-        ${state.onboardingStep > 0 ? '<button class="icon-btn" id="backOnboarding" aria-label="Voltar">←</button>' : '<span></span>'}
-      </div>
-      <section class="slide-up">
-        <div class="hero-visual"><span class="hero-icon">${step.icon}</span></div>
-        <span class="eyebrow">${step.eyebrow}</span>
-        <h1>${step.title}</h1>
-        <p class="lead">${step.text}</p>
-        <div class="dots">${onboarding.map((_, i) => `<span class="${i === state.onboardingStep ? 'active' : ''}"></span>`).join('')}</div>
-        <button class="primary-btn" id="nextOnboarding">${state.onboardingStep === onboarding.length - 1 ? 'COMEÇAR' : 'CONTINUAR'}</button>
-      </section>
-    </main>`;
-
-  document.querySelector('#nextOnboarding').onclick = () => {
-    if (state.onboardingStep < onboarding.length - 1) {
-      state.onboardingStep += 1;
-      save();
-      renderOnboarding();
-    } else {
-      renderGoals();
-    }
-  };
-  document.querySelector('#backOnboarding')?.addEventListener('click', () => {
-    state.onboardingStep = Math.max(0, state.onboardingStep - 1);
-    save();
-    renderOnboarding();
-  });
-}
-
-function renderGoals() {
-  app.innerHTML = `
-    <main class="screen fade-in">
-      <span class="eyebrow">Personalização</span>
-      <h1>O que você quer fortalecer?</h1>
-      <p class="lead">Escolha quantas áreas quiser. Você poderá alterar isso depois.</p>
-      <div class="goal-grid">
-        ${goalOptions.map(([id, icon, title, subtitle]) => `
-          <button class="goal-card ${state.goals.includes(id) ? 'selected' : ''}" data-goal="${id}">
-            <span class="goal-icon">${icon}</span>
-            <span class="goal-copy"><strong>${title}</strong><small>${subtitle}</small></span>
-            <span class="goal-check">✓</span>
-          </button>`).join('')}
-      </div>
-      <div style="height:20px"></div>
-      <button class="primary-btn" id="goRoutine" ${state.goals.length ? '' : 'disabled'}>CONTINUAR</button>
-    </main>`;
-
-  document.querySelectorAll('[data-goal]').forEach((button) => {
-    button.onclick = () => {
-      const id = button.dataset.goal;
-      const exists = state.goals.includes(id);
-      const goals = exists ? state.goals.filter((goal) => goal !== id) : [...state.goals, id];
-      if (!goals.length) return;
-      setState({ goals });
-      renderGoals();
-    };
-  });
-  document.querySelector('#goRoutine').onclick = renderRoutine;
-}
-
-function renderRoutine() {
-  app.innerHTML = `
-    <main class="screen fade-in">
-      <span class="eyebrow">Sua rotina</span>
-      <h1>Crie seus momentos do dia.</h1>
-      <p class="lead">Escolha horários que façam sentido para você. No APK, esses horários serão usados para notificações nativas.</p>
-
-      <div class="time-card">
-        <span class="symbol">☀️</span>
-        <div><strong>Manhã</strong><div class="date">Comece o dia com intenção.</div></div>
-        <input id="morningTime" type="time" value="${escapeHtml(state.morning)}" aria-label="Horário da manhã">
-      </div>
-      <div class="time-card">
-        <span class="symbol">🌙</span>
-        <div><strong>Noite</strong><div class="date">Encerre o dia com calma.</div></div>
-        <input id="nightTime" type="time" value="${escapeHtml(state.night)}" aria-label="Horário da noite">
-      </div>
-
-      <div style="height:18px"></div>
-      <button class="primary-btn" id="finishSetup">ENTRAR NO ELEVA</button>
-      <p class="notice">As afirmações apoiam foco, bem-estar e hábitos. Elas não substituem cuidados médicos, tratamento profissional nem garantem resultados financeiros.</p>
-    </main>`;
-
-  document.querySelector('#finishSetup').onclick = () => {
-    setState({
-      morning: document.querySelector('#morningTime').value || '07:00',
-      night: document.querySelector('#nightTime').value || '21:30',
-      onboarded: true,
-      activeTab: 'home',
-    });
-  };
-}
-
-function nav(active) {
-  return `
-    <nav class="bottom-nav" aria-label="Navegação principal">
-      <button class="nav-btn ${active === 'home' ? 'active' : ''}" data-tab="home"><span>⌂</span><span>Início</span></button>
-      <button class="nav-btn ${active === 'journey' ? 'active' : ''}" data-tab="journey"><span>✦</span><span>Jornada</span></button>
-      <button class="nav-btn ${active === 'favorites' ? 'active' : ''}" data-tab="favorites"><span>♡</span><span>Favoritos</span></button>
-      <button class="nav-btn ${active === 'profile' ? 'active' : ''}" data-tab="profile"><span>◉</span><span>Perfil</span></button>
-    </nav>`;
-}
-
-function bindNav() {
-  document.querySelectorAll('[data-tab]').forEach((button) => {
-    button.onclick = () => setState({ activeTab: button.dataset.tab });
-  });
-}
-
-function currentAffirmation() {
-  const goal = state.goals[0] || 'prosperidade';
-  return affirmations[goal] || affirmations.prosperidade;
-}
-
-function renderHome() {
-  const affirmation = currentAffirmation();
-  const progress = Math.min(100, Math.round((state.completedDays / 21) * 100));
-  app.innerHTML = `
-    <main class="screen fade-in">
-      <header class="home-header">
-        <div>
-          <span class="eyebrow">Seu momento</span>
-          <h1>${greeting()} 👋</h1>
-          <div class="date">${dateLabel()}</div>
-        </div>
-        <div class="streak"><strong>🔥 ${state.streak}</strong><small>dias</small></div>
-      </header>
-
-      <section class="affirmation-card slide-up">
-        <span class="category-pill">${affirmation.label}</span>
-        <p class="quote">“${affirmation.text}”</p>
-        <div class="card-actions">
-          <button class="listen-btn" id="listen">▶ Ouvir</button>
-          <button class="round-btn ${state.favorite ? 'active' : ''}" id="favorite" aria-label="Favoritar">${state.favorite ? '♥' : '♡'}</button>
-        </div>
-      </section>
-
-      <div class="section-title"><h2>Transforme em ação</h2><span class="date">hoje</span></div>
-      <section class="action-card ${state.actionDone ? 'completed' : ''}">
-        <span class="action-icon">🎯</span>
-        <div class="action-copy"><strong>Ação de hoje</strong><p>${affirmation.action}</p></div>
-        <button class="check-btn" id="completeAction" aria-label="Concluir ação">${state.actionDone ? '✓' : '○'}</button>
-      </section>
-
-      <div class="section-title"><h2>Sua jornada</h2><span class="date">${state.completedDays}/21 dias</span></div>
-      <section class="progress-card">
-        <div class="progress-row"><span>Jornada de consistência</span><span>${progress}%</span></div>
-        <div class="progress-bar"><span style="width:${progress}%"></span></div>
-      </section>
-      ${nav('home')}
-    </main>`;
-
-  document.querySelector('#listen').onclick = () => speak(affirmation.text);
-  document.querySelector('#favorite').onclick = () => setState({ favorite: !state.favorite });
-  document.querySelector('#completeAction').onclick = () => {
-    if (state.actionDone) return setState({ actionDone: false });
-    setState({ actionDone: true, completedDays: Math.min(21, state.completedDays + 1), streak: state.streak + 1 });
-  };
-  bindNav();
-}
-
-function renderJourney() {
-  const progress = Math.min(100, Math.round((state.completedDays / 21) * 100));
-  app.innerHTML = `
-    <main class="screen fade-in">
-      <span class="eyebrow">Jornada</span>
-      <h1>21 dias de consistência.</h1>
-      <p class="lead">Uma experiência curta para conectar pensamentos mais úteis com pequenas ações diárias.</p>
-      <section class="affirmation-card">
-        <span class="category-pill">Progresso</span>
-        <p class="quote">Dia ${state.completedDays} de 21</p>
-        <div class="progress-bar"><span style="width:${progress}%"></span></div>
-      </section>
-      <div class="section-title"><h2>Próximos passos</h2></div>
-      <div class="list-card"><h3>✓ Afirmação</h3><p>Ouça com atenção e sem pressa.</p></div>
-      <div class="list-card"><h3>${state.actionDone ? '✓' : '○'} Ação prática</h3><p>Transforme a frase em uma decisão observável no seu dia.</p></div>
-      <div class="list-card"><h3>○ Reflexão noturna</h3><p>Registre mentalmente o que funcionou e o que você quer ajustar amanhã.</p></div>
-      ${nav('journey')}
-    </main>`;
-  bindNav();
-}
-
-function renderFavorites() {
-  const affirmation = currentAffirmation();
-  app.innerHTML = `
-    <main class="screen fade-in">
-      <span class="eyebrow">Biblioteca</span>
-      <h1>Seus favoritos.</h1>
-      <p class="lead">Salve frases importantes para ouvir novamente quando quiser.</p>
-      ${state.favorite ? `<div class="list-card"><h3>♥ ${affirmation.label}</h3><p>“${affirmation.text}”</p><div style="height:14px"></div><button class="mini-btn" id="playFav">▶ Ouvir</button></div>` : '<div class="list-card"><h3>Nenhuma frase salva ainda</h3><p>Toque no coração da tela inicial para adicionar sua primeira favorita.</p></div>'}
-      ${nav('favorites')}
-    </main>`;
-  document.querySelector('#playFav')?.addEventListener('click', () => speak(affirmation.text));
-  bindNav();
-}
-
-function renderProfile() {
-  app.innerHTML = `
-    <main class="screen fade-in">
-      <span class="eyebrow">Configurações</span>
-      <h1>Seu Eleva.</h1>
-      <p class="lead">Ajuste sua experiência sem perder o progresso.</p>
-      <section class="list-card">
-        <div class="settings-row"><div><strong>☀️ Manhã</strong><div class="date">Momento diário</div></div><span>${escapeHtml(state.morning)}</span></div>
-        <div class="settings-row"><div><strong>🌙 Noite</strong><div class="date">Momento diário</div></div><span>${escapeHtml(state.night)}</span></div>
-        <div class="settings-row"><div><strong>🎯 Objetivos</strong><div class="date">${state.goals.length} selecionados</div></div><button class="mini-btn" id="editGoals">Editar</button></div>
-        <div class="settings-row"><div><strong>↻ Reiniciar introdução</strong><div class="date">Testar splash e onboarding novamente</div></div><button class="mini-btn" id="resetOnboarding">Reiniciar</button></div>
-      </section>
-      <p class="notice">Versão web inicial. Notificações confiáveis em segundo plano serão implementadas na etapa APK com recursos nativos do Android.</p>
-      ${nav('profile')}
-    </main>`;
-  document.querySelector('#editGoals').onclick = renderGoals;
-  document.querySelector('#resetOnboarding').onclick = () => {
-    state = { ...defaultState };
-    save();
-    splash();
-  };
-  bindNav();
-}
-
-function render() {
-  if (!state.onboarded) return renderOnboarding();
-  if (state.activeTab === 'journey') return renderJourney();
-  if (state.activeTab === 'favorites') return renderFavorites();
-  if (state.activeTab === 'profile') return renderProfile();
-  return renderHome();
-}
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
-}
-
-splash();
+function splash(){app.innerHTML=`<main class="screen splash fade-in"><div class="splash-inner"><div class="logo-mark">✦</div><h1 class="brand">Eleva</h1><p class="tagline">Fortaleça sua mente.<br>Transforme seu dia.</p><div class="loading-dots"><span></span><span></span><span></span></div></div></main>`;setTimeout(()=>state.onboarded?render():renderOnboarding(),1700)}
+const onboarding=[{icon:'✨',eyebrow:'Bem-vindo',title:'Comece por dentro.',text:'Pensamentos mais conscientes podem apoiar hábitos, escolhas e decisões melhores no dia a dia.'},{icon:'🎧',eyebrow:'Ouça e respire',title:'Uma frase nova em cada momento.',text:'Manhã e noite recebem mensagens diferentes, narradas pelo próprio celular, sem repetir frases já utilizadas.'},{icon:'✓',eyebrow:'Palavra + ação',title:'Não fique apenas na frase.',text:'Cada momento traz uma pequena ação prática para transformar intenção em comportamento.'}];
+function renderOnboarding(){const s=onboarding[state.onboardingStep]||onboarding[0];app.innerHTML=`<main class="screen fade-in"><div class="top-actions"><span class="eyebrow">Eleva</span>${state.onboardingStep>0?'<button class="icon-btn" id="backOnboarding">←</button>':'<span></span>'}</div><section class="slide-up"><div class="hero-visual"><span class="hero-icon">${s.icon}</span></div><span class="eyebrow">${s.eyebrow}</span><h1>${s.title}</h1><p class="lead">${s.text}</p><div class="dots">${onboarding.map((_,i)=>`<span class="${i===state.onboardingStep?'active':''}"></span>`).join('')}</div><button class="primary-btn" id="nextOnboarding">${state.onboardingStep===onboarding.length-1?'COMEÇAR':'CONTINUAR'}</button></section></main>`;document.querySelector('#nextOnboarding').onclick=()=>{if(state.onboardingStep<onboarding.length-1){state.onboardingStep++;save();renderOnboarding()}else renderGoals()};document.querySelector('#backOnboarding')?.addEventListener('click',()=>{state.onboardingStep=Math.max(0,state.onboardingStep-1);save();renderOnboarding()})}
+function renderGoals(){app.innerHTML=`<main class="screen fade-in"><span class="eyebrow">Personalização</span><h1>O que você quer fortalecer?</h1><p class="lead">Escolha quantas áreas quiser. O Eleva alternará entre elas.</p><div class="goal-grid">${goalOptions.map(([id,icon,title,subtitle])=>`<button class="goal-card ${state.goals.includes(id)?'selected':''}" data-goal="${id}"><span class="goal-icon">${icon}</span><span class="goal-copy"><strong>${title}</strong><small>${subtitle}</small></span><span class="goal-check">✓</span></button>`).join('')}</div><div style="height:20px"></div><button class="primary-btn" id="goRoutine">CONTINUAR</button></main>`;document.querySelectorAll('[data-goal]').forEach(b=>b.onclick=()=>{const id=b.dataset.goal,exists=state.goals.includes(id),goals=exists?state.goals.filter(g=>g!==id):[...state.goals,id];if(!goals.length)return;state.goals=goals;save();renderGoals()});document.querySelector('#goRoutine').onclick=renderRoutine}
+function renderRoutine(){app.innerHTML=`<main class="screen fade-in"><span class="eyebrow">Sua rotina</span><h1>Crie seus momentos do dia.</h1><p class="lead">Cada data terá uma frase exclusiva de manhã e outra à noite.</p><div class="time-card"><span class="symbol">☀️</span><div><strong>Manhã</strong><div class="date">Mensagem para começar o dia.</div></div><input id="morningTime" type="time" value="${escapeHtml(state.morning)}"></div><div class="time-card"><span class="symbol">🌙</span><div><strong>Noite</strong><div class="date">Mensagem para encerrar o dia.</div></div><input id="nightTime" type="time" value="${escapeHtml(state.night)}"></div><div style="height:18px"></div><button class="primary-btn" id="finishSetup">ENTRAR NO ELEVA</button><p class="notice">Afirmações apoiam foco e hábitos; não substituem cuidados médicos nem garantem resultados financeiros.</p></main>`;document.querySelector('#finishSetup').onclick=()=>setState({morning:document.querySelector('#morningTime').value||'07:00',night:document.querySelector('#nightTime').value||'21:30',onboarded:true,activeTab:'home'})}
+function nav(active){return`<nav class="bottom-nav"><button class="nav-btn ${active==='home'?'active':''}" data-tab="home"><span>⌂</span><span>Início</span></button><button class="nav-btn ${active==='journey'?'active':''}" data-tab="journey"><span>✦</span><span>Jornada</span></button><button class="nav-btn ${active==='favorites'?'active':''}" data-tab="favorites"><span>♡</span><span>Favoritos</span></button><button class="nav-btn ${active==='profile'?'active':''}" data-tab="profile"><span>◉</span><span>Perfil</span></button></nav>`}
+function bindNav(){document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{stopSpeaking();setState({activeTab:b.dataset.tab})})}
+function renderHome(){const slot=currentSlotKey(),a=affirmationForSlot(slot),period=currentPeriod(),fav=isFavorite(a.id),done=Boolean(state.actionDoneBySlot?.[slot]),progress=Math.min(100,Math.round(state.completedDays/21*100));app.innerHTML=`<main class="screen fade-in"><header class="home-header"><div><span class="eyebrow">${period==='morning'?'Momento da manhã ☀️':'Momento da noite 🌙'}</span><h1>${greeting()} 👋</h1><div class="date">${dateLabel()}</div></div><div class="streak"><strong>🔥 ${state.streak}</strong><small>dias</small></div></header><section class="affirmation-card slide-up"><div class="affirmation-meta"><span class="category-pill">${a.label}</span><span class="unique-pill">NOVA</span></div><p class="quote">“${a.text}”</p><div id="audioVisualizer" class="audio-visualizer"><span></span><span></span><span></span><span></span><span></span></div><div class="card-actions"><button class="listen-btn" id="listen" aria-pressed="false"><span class="listen-icon">▶</span><span class="listen-label">Ouvir</span></button><button class="round-btn ${fav?'active':''}" id="favorite">${fav?'♥':'♡'}</button></div></section><div class="section-title"><h2>Transforme em ação</h2><span class="date">${period==='morning'?'manhã':'noite'}</span></div><section class="action-card ${done?'completed':''}"><span class="action-icon">🎯</span><div class="action-copy"><strong>Ação deste momento</strong><p>${a.action}</p></div><button class="check-btn" id="completeAction">${done?'✓':'○'}</button></section><div class="section-title"><h2>Sua jornada</h2><span class="date">${state.completedDays}/21 dias</span></div><section class="progress-card"><div class="progress-row"><span>Jornada de consistência</span><span>${progress}%</span></div><div class="progress-bar"><span style="width:${progress}%"></span></div></section>${nav('home')}</main>`;document.querySelector('#listen').onclick=()=>speak(a.text);document.querySelector('#favorite').onclick=()=>toggleFavorite(a.id);document.querySelector('#completeAction').onclick=()=>{const map={...(state.actionDoneBySlot||{})};if(map[slot]){delete map[slot];setState({actionDoneBySlot:map})}else{map[slot]=true;setState({actionDoneBySlot:map,completedDays:Math.min(21,state.completedDays+1),streak:state.streak+1})}};bindNav()}
+function renderJourney(){const progress=Math.min(100,Math.round(state.completedDays/21*100));app.innerHTML=`<main class="screen fade-in"><span class="eyebrow">Jornada</span><h1>21 dias de consistência.</h1><p class="lead">Cada manhã e cada noite têm conteúdo próprio. O histórico evita repetir afirmações já utilizadas.</p><section class="affirmation-card"><span class="category-pill">Progresso</span><p class="quote">Dia ${state.completedDays} de 21</p><div class="progress-bar"><span style="width:${progress}%"></span></div></section><div class="section-title"><h2>Seu ritmo</h2></div><div class="list-card"><h3>☀️ ${state.morning}</h3><p>Afirmação exclusiva da manhã.</p></div><div class="list-card"><h3>🌙 ${state.night}</h3><p>Afirmação exclusiva da noite.</p></div>${nav('journey')}</main>`;bindNav()}
+function renderFavorites(){const items=(state.favorites||[]).slice().reverse().map(id=>{const[goal,a,b,c]=id.split('-');if(!phraseParts[goal])return'';const item=makeAffirmation(goal,Number(a),Number(b),Number(c));return`<div class="list-card"><span class="category-pill">${item.label}</span><h3 style="margin-top:12px">“${item.text}”</h3><button class="mini-btn favorite-listen" data-text="${escapeHtml(item.text)}">▶ Ouvir</button></div>`}).join('');app.innerHTML=`<main class="screen fade-in"><span class="eyebrow">Favoritos</span><h1>Frases que você guardou.</h1>${items||'<div class="list-card"><h3>Nenhum favorito ainda</h3><p>Toque no coração de uma afirmação para guardar aqui.</p></div>'}${nav('favorites')}</main>`;document.querySelectorAll('.favorite-listen').forEach(b=>b.onclick=()=>speak(b.dataset.text));bindNav()}
+function renderProfile(){app.innerHTML=`<main class="screen fade-in"><span class="eyebrow">Perfil</span><h1>Seu Eleva.</h1><div class="list-card"><div class="settings-row"><div><strong>☀️ Manhã</strong><div class="date">Horário configurado</div></div><span>${escapeHtml(state.morning)}</span></div><div class="settings-row"><div><strong>🌙 Noite</strong><div class="date">Horário configurado</div></div><span>${escapeHtml(state.night)}</span></div><div class="settings-row"><div><strong>Frases únicas usadas</strong><div class="date">Histórico sem repetição</div></div><span>${state.usedAffirmationIds.length}</span></div></div><button class="secondary-btn" id="editRoutine">ALTERAR ROTINA</button><div style="height:10px"></div><button class="secondary-btn" id="restart">REVER INTRODUÇÃO</button>${nav('profile')}</main>`;document.querySelector('#editRoutine').onclick=renderRoutine;document.querySelector('#restart').onclick=()=>{state.onboarded=false;state.onboardingStep=0;save();renderOnboarding()};bindNav()}
+function render(){if(!state.onboarded)return renderOnboarding();if(state.activeTab==='journey')return renderJourney();if(state.activeTab==='favorites')return renderFavorites();if(state.activeTab==='profile')return renderProfile();return renderHome()}
+window.addEventListener('beforeunload',stopSpeaking);document.addEventListener('visibilitychange',()=>{if(document.hidden)stopSpeaking()});if('speechSynthesis'in window)speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();splash();
